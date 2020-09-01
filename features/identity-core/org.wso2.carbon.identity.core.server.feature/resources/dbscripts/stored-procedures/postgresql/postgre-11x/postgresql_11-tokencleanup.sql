@@ -23,6 +23,8 @@ chunkCount INT := 0;
 batchCount INT := 0;
 enableReindexing boolean;
 enableTblAnalyzing boolean;
+customMaxScriptExecTime int;
+customScriptExecEndTime timestamp;
 
 tablesCursor CURSOR FOR SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = current_schema() AND
 tablename  IN ('idn_oauth2_access_token', 'idn_oauth2_authorization_code', 'idn_oauth2_access_token_scope','idn_oidc_req_object_reference','idn_oidc_req_object_claims','idn_oidc_req_obj_claim_values');
@@ -44,12 +46,14 @@ logLevel := 'TRACE'; -- SET LOG LEVELS : TRACE , DEBUG
 enableAudit := FALSE;  -- SET TRUE FOR  KEEP TRACK OF ALL THE DELETED TOKENS USING A TABLE    [DEFAULT : FALSE] [# IF YOU ENABLE THIS TABLE BACKUP WILL FORCEFULLY SET TO TRUE]
 enableReindexing :=FALSE; -- SET TRUE FOR GATHER SCHEMA LEVEL STATS TO IMPROVE QUERY PERFOMANCE [DEFAULT : FALSE]
 enableTblAnalyzing :=FALSE;	-- SET TRUE FOR Rebuild Indexes TO IMPROVE QUERY PERFOMANCE [DEFAULT : FALSE]
+customMaxScriptExecTime := 10; -- SET MAX SCRIPT EXECUTION TIME BY MINUTES
 
 -- ------------------------------------------
 -- CONSTANT VARIABLES
 -- ------------------------------------------
 deleteTillTime := timezone('UTC'::text, now()) - INTERVAL '1hour' * safePeriod;
 maxValidityPeriod :=99999999999990;
+customScriptExecEndTime := timezone('UTC'::text, now()) + (customMaxScriptExecTime * INTERVAL '1minute');
 
 
 -- ------------------------------------------------------
@@ -180,6 +184,10 @@ RAISE NOTICE 'TOKEN DELETE ON IDN_OAUTH2_ACCESS_TOKEN STARTED .... !';
 END IF;
 
 LOOP
+    IF (customScriptExecEndTime <= timezone('UTC'::text, now()))
+    THEN
+    RETURN;
+    END IF;
 
     SELECT count(1) INTO rowcount  from pg_catalog.pg_tables WHERE schemaname = current_schema() AND tablename IN ('chunk_idn_oauth2_access_token');
     IF (rowcount = 1)
@@ -313,6 +321,11 @@ RAISE NOTICE 'CODE DELETE ON IDN_OAUTH2_AUTHORIZATION_CODE STARTED .... !';
 END IF;
 
 LOOP
+    IF (customScriptExecEndTime <= timezone('UTC'::text, now()))
+    THEN
+    RETURN;
+    END IF;
+
       SELECT count(1) INTO rowcount  from pg_catalog.pg_tables WHERE schemaname = current_schema() AND tablename IN ('idn_oauth2_authorization_code_chunk');
       IF (rowcount = 1)
       THEN
